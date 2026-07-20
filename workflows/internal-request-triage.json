@@ -1,0 +1,244 @@
+{
+  "name": "Internal Request Triage (Portfolio Prototype)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal-request-triage",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "913c2fb2-89b8-4df7-a24b-0f6098f8102b",
+      "name": "Webhook Intake"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "adfc0926-654c-4a1e-b715-1b1c8175029d",
+              "name": "requester",
+              "value": "={{ $json.body.requester }}",
+              "type": "string"
+            },
+            {
+              "id": "4b39b28f-0445-42ee-a26f-536d1c2961cf",
+              "name": "request_type",
+              "value": "={{ $json.body.request_type }}",
+              "type": "string"
+            },
+            {
+              "id": "193c8ae8-2d18-4a64-8775-900587b61199",
+              "name": "description",
+              "value": "={{ $json.body.description }}",
+              "type": "string"
+            },
+            {
+              "id": "b165124d-f738-4e04-99c3-3ec6b2f43eb1",
+              "name": "needed_by",
+              "value": "={{ $json.body.needed_by }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "cc74232d-dac3-43aa-be0f-23bdf1501cab",
+      "name": "Prepare Request Data"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const requiredFields = [\n  'requester',\n  'request_type',\n  'description',\n  'needed_by',\n];\n\nconst missingFields = requiredFields.filter((field) => {\n  return !$json[field] || $json[field].trim() === '';\n});\n\nconst sensitiveRequestTypes = [\n  'access_request',\n  'payment_request',\n  'supplier_request',\n];\n\nconst humanReviewRequired =\n  missingFields.length > 0 ||\n  sensitiveRequestTypes.includes($json.request_type);\n\nreturn {\n  json: {\n    ...$json,\n    missing_fields: missingFields,\n    request_complete: missingFields.length === 0,\n    human_review_required: humanReviewRequired,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "50f1728d-f18d-419e-bdfb-3c6f33a7131b",
+      "name": "Validate Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6db9fb15-b1ef-4da1-9fef-d9d2c1796b37",
+              "leftValue": "={{ $json.human_review_required }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        0
+      ],
+      "id": "7d29615f-ec38-41ce-bb0f-7210441fad9e",
+      "name": "Requires Human Review?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8ffa2f33-c6d8-4279-b143-e4f2f6721c70",
+              "name": "route",
+              "value": "human_review",
+              "type": "string"
+            },
+            {
+              "id": "2545ab6a-c717-47a3-8f25-a8067f320f3f",
+              "name": "review_reason",
+              "value": "Human review required because the request is sensitive or incomplete.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        -96
+      ],
+      "id": "a30d2df7-27b3-4488-8e7a-1b12a32654c5",
+      "name": "Human Review Queue"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dac19bf2-75a2-46b2-98ac-448231766fd0",
+              "name": "route",
+              "value": "normal_processing",
+              "type": "string"
+            },
+            {
+              "id": "eed9c036-89a5-4c02-9705-25a3982dc51f",
+              "name": "review_reason",
+              "value": "Request is complete and does not require human review.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        96
+      ],
+      "id": "dca06abf-0a34-47b6-9266-742c4d8566b6",
+      "name": "Normal Processing Queue"
+    }
+  ],
+  "pinData": {
+    "Webhook Intake": [
+      {
+        "json": {
+          "body": {
+            "requester": "Marek Kowalski",
+            "request_type": "information_request",
+            "description": "Please send the current template for the monthly reporting pack.",
+            "needed_by": "2026-07-28"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook Intake": {
+      "main": [
+        [
+          {
+            "node": "Prepare Request Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Request Data": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Requires Human Review?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requires Human Review?": {
+      "main": [
+        [
+          {
+            "node": "Human Review Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normal Processing Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
