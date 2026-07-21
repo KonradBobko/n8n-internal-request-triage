@@ -1,5 +1,5 @@
 {
-  "name": "Internal Request Triage (Portfolio Prototype)",
+  "name": "AI-Assisted Internal Request Triage — Portfolio Prototype",
   "nodes": [
     {
       "parameters": {
@@ -14,7 +14,7 @@
         0
       ],
       "id": "913c2fb2-89b8-4df7-a24b-0f6098f8102b",
-      "name": "Webhook Intake"
+      "name": "Webhook"
     },
     {
       "parameters": {
@@ -55,7 +55,7 @@
         0
       ],
       "id": "cc74232d-dac3-43aa-be0f-23bdf1501cab",
-      "name": "Prepare Request Data"
+      "name": "Edit Fields"
     },
     {
       "parameters": {
@@ -65,11 +65,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        432,
+        448,
         0
       ],
       "id": "50f1728d-f18d-419e-bdfb-3c6f33a7131b",
-      "name": "Validate Request"
+      "name": "Code in JavaScript"
     },
     {
       "parameters": {
@@ -99,11 +99,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        640,
+        672,
         0
       ],
       "id": "7d29615f-ec38-41ce-bb0f-7210441fad9e",
-      "name": "Requires Human Review?"
+      "name": "If"
     },
     {
       "parameters": {
@@ -129,11 +129,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        848,
+        896,
         -96
       ],
       "id": "a30d2df7-27b3-4488-8e7a-1b12a32654c5",
-      "name": "Human Review Queue"
+      "name": "Sensitive / incomplete request"
     },
     {
       "parameters": {
@@ -159,15 +159,44 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        848,
+        896,
         96
       ],
       "id": "dca06abf-0a34-47b6-9266-742c4d8566b6",
       "name": "Normal Processing Queue"
+    },
+    {
+      "parameters": {
+        "url": "https://jsonplaceholder.typicode.com/todos/1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        272
+      ],
+      "id": "fb309bd0-fa9b-49e5-9037-c3a56e0b0923",
+      "name": "Mock Reference API Lookup"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1344,
+        112
+      ],
+      "id": "4f81360e-f6f0-40d1-87a8-cb63bfc7e36b",
+      "name": "Enriched Normal Request"
     }
   ],
   "pinData": {
-    "Webhook Intake": [
+    "Webhook": [
       {
         "json": {
           "body": {
@@ -181,44 +210,44 @@
     ]
   },
   "connections": {
-    "Webhook Intake": {
+    "Webhook": {
       "main": [
         [
           {
-            "node": "Prepare Request Data",
+            "node": "Edit Fields",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Request Data": {
+    "Edit Fields": {
       "main": [
         [
           {
-            "node": "Validate Request",
+            "node": "Code in JavaScript",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Request": {
+    "Code in JavaScript": {
       "main": [
         [
           {
-            "node": "Requires Human Review?",
+            "node": "If",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Requires Human Review?": {
+    "If": {
       "main": [
         [
           {
-            "node": "Human Review Queue",
+            "node": "Sensitive / incomplete request",
             "type": "main",
             "index": 0
           }
@@ -228,6 +257,33 @@
             "node": "Normal Processing Queue",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Normal Processing Queue": {
+      "main": [
+        [
+          {
+            "node": "Mock Reference API Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Enriched Normal Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Reference API Lookup": {
+      "main": [
+        [
+          {
+            "node": "Enriched Normal Request",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
