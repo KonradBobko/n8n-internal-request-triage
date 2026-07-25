@@ -14,7 +14,7 @@
         0
       ],
       "id": "913c2fb2-89b8-4df7-a24b-0f6098f8102b",
-      "name": "Webhook"
+      "name": "Receive Internal Request"
     },
     {
       "parameters": {
@@ -55,12 +55,12 @@
         0
       ],
       "id": "cc74232d-dac3-43aa-be0f-23bdf1501cab",
-      "name": "Edit Fields"
+      "name": "Normalize Incoming Request"
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const requiredFields = [\n  'requester',\n  'request_type',\n  'description',\n  'needed_by',\n];\n\nconst missingFields = requiredFields.filter((field) => {\n  return !$json[field] || $json[field].trim() === '';\n});\n\nconst sensitiveRequestTypes = [\n  'access_request',\n  'payment_request',\n  'supplier_request',\n];\n\nconst humanReviewRequired =\n  missingFields.length > 0 ||\n  sensitiveRequestTypes.includes($json.request_type);\n\nreturn {\n  json: {\n    ...$json,\n    missing_fields: missingFields,\n    request_complete: missingFields.length === 0,\n    human_review_required: humanReviewRequired,\n  },\n};"
+        "jsCode": "const requiredFields = [\n  'requester',\n  'request_type',\n  'description',\n  'needed_by',\n];\n\nconst missingFields = requiredFields.filter((field) => {\n  const value = $json[field];\n  return typeof value !== 'string' || value.trim() === '';\n});\n\nconst requestType =\n  typeof $json.request_type === 'string'\n    ? $json.request_type.trim()\n    : '';\n\nconst sensitiveRequestTypes = [\n  'access_request',\n  'payment_request',\n  'supplier_request',\n];\n\nconst knownRequestTypes = [\n  'information_request',\n  'access_request',\n  'payment_request',\n  'supplier_request',\n];\n\nconst unknownRequestType =\n  requestType !== '' &&\n  !knownRequestTypes.includes(requestType);\n\nconst humanReviewRequired =\n  missingFields.length > 0 ||\n  sensitiveRequestTypes.includes(requestType) ||\n  unknownRequestType;\n\nreturn {\n  json: {\n    ...$json,\n    request_type: requestType,\n    missing_fields: missingFields,\n    request_complete: missingFields.length === 0,\n    unknown_request_type: unknownRequestType,\n    human_review_required: humanReviewRequired,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -69,7 +69,7 @@
         0
       ],
       "id": "50f1728d-f18d-419e-bdfb-3c6f33a7131b",
-      "name": "Code in JavaScript"
+      "name": "Validate Request & Set Review Flag"
     },
     {
       "parameters": {
@@ -103,7 +103,7 @@
         0
       ],
       "id": "7d29615f-ec38-41ce-bb0f-7210441fad9e",
-      "name": "If"
+      "name": "Human Review Required?"
     },
     {
       "parameters": {
@@ -118,7 +118,7 @@
             {
               "id": "2545ab6a-c717-47a3-8f25-a8067f320f3f",
               "name": "review_reason",
-              "value": "Human review required because the request is sensitive or incomplete.",
+              "value": "Human review required because the request is incomplete, sensitive, or its request type is not recognised.",
               "type": "string"
             }
           ]
@@ -133,7 +133,7 @@
         -96
       ],
       "id": "a30d2df7-27b3-4488-8e7a-1b12a32654c5",
-      "name": "Sensitive / incomplete request"
+      "name": "Prepare Human Review Outcome"
     },
     {
       "parameters": {
@@ -163,7 +163,7 @@
         96
       ],
       "id": "dca06abf-0a34-47b6-9266-742c4d8566b6",
-      "name": "Normal Processing Queue"
+      "name": "Prepare Normal Processing Record"
     },
     {
       "parameters": {
@@ -177,7 +177,7 @@
         272
       ],
       "id": "fb309bd0-fa9b-49e5-9037-c3a56e0b0923",
-      "name": "Mock Reference API Lookup"
+      "name": "Fetch Mock Reference Data"
     },
     {
       "parameters": {
@@ -192,98 +192,262 @@
         112
       ],
       "id": "4f81360e-f6f0-40d1-87a8-cb63bfc7e36b",
-      "name": "Enriched Normal Request"
+      "name": "Merge Request with Reference Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a concise, neutral summary of this already validated low-risk internal request.\n\nDo not approve, reject, change its route, invent facts, or give access, payment, supplier, or financial advice.\n\nRequest details:\n- Requester: {{ $json.requester }}\n- Request type: {{ $json.request_type }}\n- Description: {{ $json.description }}\n- Needed by: {{ $json.needed_by }}\n- Existing route: {{ $json.route }}\n\nReturn only a short summary of no more than two sentences.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1552,
+        112
+      ],
+      "id": "467d8694-eb8d-4869-8a55-b3403e081229",
+      "name": "Generate Local AI Summary"
+    },
+    {
+      "parameters": {
+        "model": "gemma4:e4b-mlx",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        320
+      ],
+      "id": "29e0d9a6-b871-4034-bef2-036cb588684b",
+      "name": "Local Gemma Model (Ollama)"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requester": "={{ $('Merge Request with Reference Data').item.json.requester }}",
+            "request_type": "={{ $('Merge Request with Reference Data').item.json.request_type }}",
+            "needed_by": "={{ $('Merge Request with Reference Data').item.json.needed_by }}",
+            "route": "={{ $('Merge Request with Reference Data').item.json.route }}",
+            "llm_summary": "={{ $json.text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requester",
+              "displayName": "requester",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "request_type",
+              "displayName": "request_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "needed_by",
+              "displayName": "needed_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "route",
+              "displayName": "route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "llm_summary",
+              "displayName": "llm_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "column": [
+            {
+              "name": "requester"
+            },
+            {
+              "name": "request_type"
+            },
+            {
+              "name": "needed_by"
+            },
+            {
+              "name": "route"
+            },
+            {
+              "name": "llm_summary"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1904,
+        112
+      ],
+      "id": "6866414d-952c-4507-aa37-6da42a006c07",
+      "name": "Save Eligible Request Summary"
     }
   ],
   "pinData": {
-    "Webhook": [
+    "Receive Internal Request": [
       {
         "json": {
           "body": {
             "requester": "Marek Kowalski",
             "request_type": "information_request",
-            "description": "Please send the current template for the monthly reporting pack.",
-            "needed_by": "2026-07-28"
+            "description": "Please share the current internal travel-expense policy for a planned training trip.",
+            "needed_by": "2026-08-01"
           }
         }
       }
     ]
   },
   "connections": {
-    "Webhook": {
+    "Normalize Incoming Request": {
       "main": [
         [
           {
-            "node": "Edit Fields",
+            "node": "Validate Request & Set Review Flag",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields": {
+    "Validate Request & Set Review Flag": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Human Review Required?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "Human Review Required?": {
       "main": [
         [
           {
-            "node": "If",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If": {
-      "main": [
-        [
-          {
-            "node": "Sensitive / incomplete request",
+            "node": "Prepare Human Review Outcome",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Normal Processing Queue",
+            "node": "Prepare Normal Processing Record",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Normal Processing Queue": {
+    "Prepare Normal Processing Record": {
       "main": [
         [
           {
-            "node": "Mock Reference API Lookup",
+            "node": "Fetch Mock Reference Data",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Enriched Normal Request",
+            "node": "Merge Request with Reference Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Mock Reference API Lookup": {
+    "Fetch Mock Reference Data": {
       "main": [
         [
           {
-            "node": "Enriched Normal Request",
+            "node": "Merge Request with Reference Data",
             "type": "main",
             "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Request with Reference Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Local AI Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Local AI Summary": {
+      "main": [
+        [
+          {
+            "node": "Save Eligible Request Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local Gemma Model (Ollama)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Local AI Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Internal Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Incoming Request",
+            "type": "main",
+            "index": 0
           }
         ]
       ]

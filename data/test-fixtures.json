@@ -1,0 +1,53 @@
+{
+  "description": "Synthetic fixtures for local n8n testing. Never replace with employer or customer data.",
+  "cases": [
+    {
+      "name": "complete_information_request",
+      "payload": {
+        "body": {
+          "requester": "Marek Kowalski",
+          "request_type": "information_request",
+          "description": "Please share the current internal travel-expense policy for a planned training trip.",
+          "needed_by": "2026-08-01"
+        }
+      },
+      "expected_route": "normal_processing"
+    },
+    {
+      "name": "sensitive_access_request",
+      "payload": {
+        "body": {
+          "requester": "Anna Nowak",
+          "request_type": "access_request",
+          "description": "I need access to the reporting dashboard to prepare the monthly report.",
+          "needed_by": "2026-08-01"
+        }
+      },
+      "expected_route": "human_review"
+    },
+    {
+      "name": "unknown_request_type",
+      "payload": {
+        "body": {
+          "requester": "Piotr Zieliński",
+          "request_type": "software_license_request",
+          "description": "Please arrange a software licence for a training demonstration.",
+          "needed_by": "2026-08-05"
+        }
+      },
+      "expected_route": "human_review"
+    },
+    {
+      "name": "malformed_requester",
+      "payload": {
+        "body": {
+          "requester": 123,
+          "request_type": "information_request",
+          "description": "Please provide the onboarding guide.",
+          "needed_by": "2026-08-05"
+        }
+      },
+      "expected_route": "human_review"
+    }
+  ]
+}
