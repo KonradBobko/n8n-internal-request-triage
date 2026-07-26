@@ -28,6 +28,26 @@ Ollama / Gemma]
 local n8n Data Table]
 ```
 
+## Execution evidence
+
+### Human-review safety path
+
+A synthetic sensitive/incomplete request stops at the human-review outcome. The mock API, local LLM, and Data Table persistence route are bypassed.
+
+![Human-review route: a successful execution ends at Prepare Human Review Outcome.](assets/screenshots/human-review-route.png)
+
+### Eligible normal-processing path
+
+A complete fictional `information_request` follows the normal route through mock REST enrichment, a local Ollama/Gemma summary, and local Data Table persistence.
+
+![Normal route: all eligible-processing nodes execute successfully.](assets/screenshots/normal-route-complete.png)
+
+### Persisted synthetic output
+
+The final node saves only the selected request fields and the generated summary. This screenshot intentionally excludes local record IDs and timestamps.
+
+![Saved eligible request summary: synthetic output with requester, request type, needed-by date, route, and LLM summary.](assets/screenshots/saved-eligible-summary.png)
+
 ## Safety model
 
 A request is routed to human review if it:
